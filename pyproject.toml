@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "collapse-bot"
+version = "0.3.0"
+description = "Collapse: Discord bot that checks members' linked Roblox accounts against Rotector flag data"
+requires-python = ">=3.12"
+dependencies = [
+    "discord.py>=2.4,<3",
+    "aiohttp>=3.9",
+    "python-dotenv>=1.0",
+    "cryptography>=42",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pyflakes>=3"]
+
+[tool.setuptools.packages.find]
+include = ["banbot*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

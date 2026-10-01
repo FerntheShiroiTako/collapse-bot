@@ -1,0 +1,47 @@
+Collapse message texts. Edit freely, then restart the bot.
+
+Each message starts with its name in [brackets] on its own line and runs until the next one. Discord
+formatting (**bold**, links, line breaks) works as usual. Leave a section empty (or delete it) to use the
+built-in text instead.
+
+[welcome] - posted in a server right after Collapse is added to it.
+
+[ban_dm] - DMed to a member right before a mod's Ban press bans them (each server can switch it off
+in /config). Placeholders, filled in per ban:
+    {server}            the server's name
+    {roblox_username}   the Roblox username the ban is based on
+    {roblox_id}         the Roblox user ID
+    {status}            Rotector's status for the account, e.g. Confirmed
+    {appeal}            "You can appeal this ban here: <link>" using the server's appeal link from
+                        /config -> More Settings; empty if the server hasn't set one. If you leave
+                        {appeal} out, the line is added at the end anyway when a server has a link.
+Rayward's terms require a ban based on Rotector data to name Rotector, so members know who to appeal to.
+Keep the Rotector mention and link in this message.
+
+[ban_dm_evasion] - DMed instead of [ban_dm] when the ban is for ban evasion: Collapse banned the same
+Roblox account here before under a different Discord account. That isn't Rotector data, so this message
+must not blame Rotector. Same placeholders as [ban_dm]; {status} is always "Ban Evasion".
+
+
+[welcome]
+Thank you for installing **Collapse**! This will scan the members of your server for any flagged accounts from Roblox Rotector and notify your mods about the detections.
+
+A server admin with **Manage Server** permissions should type in the command **/setup** to link this server's Rayward and optionally Bloxlink API keys and select a mod role/channel and sweepers.
+
+
+[ban_dm]
+You have been banned from {server}.
+
+Your Roblox account {roblox_username} with ID {roblox_id}, which is linked to your Discord profile, is marked as "{status}" according to the Rotector database that this server uses for its checks.
+
+{appeal}
+
+Rotector is a separate service, and this server has no control over its database. In case you think there is some mistake, you can appeal directly to Rotector at this link: https://rotector.com
+
+
+[ban_dm_evasion]
+You have been removed from {server}.
+
+The Roblox account linked to your Discord profile ({roblox_username}, ID {roblox_id}) was banned from this server before, under a different Discord account.
+
+{appeal}

@@ -1,0 +1,27 @@
+# systemd unit for Collapse. deploy/install-ubuntu.sh fills in @BOT_DIR@ and @USER@ and installs it
+# as /etc/systemd/system/collapse.service. To install by hand, replace both and copy it there.
+[Unit]
+Description=Collapse Discord moderation bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=@USER@
+WorkingDirectory=@BOT_DIR@
+ExecStart=@BOT_DIR@/.venv/bin/python -m banbot
+Restart=on-failure
+RestartSec=10
+# Give discord.py time to close the gateway and database cleanly on stop.
+TimeoutStopSec=30
+Environment=PYTHONUNBUFFERED=1
+
+# Basic hardening: the bot only needs to write inside its own folder.
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=read-only
+ReadWritePaths=@BOT_DIR@
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
