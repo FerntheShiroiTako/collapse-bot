@@ -133,7 +133,7 @@ class Pipeline:
         return counts
 
     async def _route_ban_evasion(self, ident: Identified, prior_discord_id: int, sweep_id: int | None) -> Bucket:
-        """Routed like a Rotector Confirmed hit: straight to a mod (or posted as a notice in report-only)."""
+        """Routed like a Confirmed hit: straight to a mod (or posted as a notice in report-only)."""
         log.warning("ban evasion: discord=%s roblox=%s previously banned here as discord=%s",
                     ident.member.id, ident.user.id, prior_discord_id)
         fr = FlagResult(

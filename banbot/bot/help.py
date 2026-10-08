@@ -10,9 +10,10 @@ from banbot import brand
 TOPICS: dict[str, tuple[str, str]] = {
     "overview": (
         "Overview",
-        "Collapse looks up the Roblox account linked to each member and checks it against Rotector's flag "
-        "data. Flagged accounts are posted to your mod channel with Ban and Dismiss buttons. The bot never "
-        "bans anyone on its own; a ban only happens when a mod presses Ban.\n\n"
+        "Collapse looks up the Roblox account linked to each member and checks it against every flag "
+        "source on Rayward: Rotector, RCR, TASE, RAB, Okappiki and ServerSweep. Flagged accounts are "
+        "posted to your mod channel with Ban and Dismiss buttons. The bot never bans anyone on its own; a ban only happens "
+        "when a mod presses Ban.\n\n"
         "A lookup that fails or times out is treated as unknown, and the member is checked again later. "
         "Each server uses its own Rayward key and starts in dry run, so nothing is banned until an admin "
         "turns dry run off.",
@@ -23,16 +24,17 @@ TOPICS: dict[str, tuple[str, str]] = {
         "Roblox account is theirs: a Bloxlink verification if they have one, otherwise a `(@username)` "
         "tag at the end of their nickname.\n\n"
         "If Collapse already banned that Roblox account here under a different Discord account, the case "
-        "goes to your mods as ban evasion. Otherwise the account is looked up on Rotector through Rayward. "
-        "Unflagged accounts are left alone, and past offenders (flagged before, cleared since) are logged "
-        "without action. Anything Rotector flags, Confirmed included, goes to your mods.",
+        "goes to your mods as ban evasion. Otherwise the account is looked up on every Rayward "
+        "source. Unflagged accounts are left alone, and past offenders (flagged before, cleared since) "
+        "are logged without action. Anything any source flags, Confirmed included, goes to your mods, "
+        "and the case names the source that flagged it.",
     ),
     "reviews": (
         "Review queue and logs",
         "Each case is posted to your mod channel with Ban and Dismiss buttons. Only your mod role can use "
-        "them, and the buttons disappear once a case is resolved. Ban checks the account on Rotector "
-        "again first, and only bans if it's still flagged. After 24 hours, Rotector's reasons are removed "
-        "from the case, as Rayward's terms require.\n\n"
+        "them, and the buttons disappear once a case is resolved. Ban checks the account on every "
+        "source again first, and only bans if it's still flagged. After 24 hours, the flag reasons are "
+        "removed from the case, as Rayward's terms require.\n\n"
         "`/reviews` lists the cases that are still open, ten per page. `/detections` goes back further and "
         "lists every detection recorded for your server, resolved or not, as a CSV file or as a list of "
         "Roblox usernames.\n\n"

@@ -27,11 +27,11 @@ from pathlib import Path
 
 log = logging.getLogger(__name__)
 
-KNOWN_SECTIONS = ("welcome", "ban_dm", "ban_dm_evasion")
+KNOWN_SECTIONS = ("welcome", "ban_dm", "ban_dm_other", "ban_dm_evasion")
 _HEADER = re.compile(r"^\[([a-z_]+)\]\s*$")
 
 DEFAULT_WELCOME = (
-    "Thanks for adding **Collapse**! It checks members' linked Roblox accounts against Rotector flag data "
+    "Thanks for adding **Collapse**! It checks members' linked Roblox accounts against Rayward's flag sources "
     "and never bans anyone without a moderator pressing a button.\n\n"
     "An admin with **Manage Server** needs to run **/setup** to connect this server's own Rayward "
     "(and optionally Bloxlink) API key, pick a mod role/channel, and choose who can run sweeps. "
@@ -39,12 +39,22 @@ DEFAULT_WELCOME = (
 )
 
 # Rayward's terms require every action taken on its data to name the source, so the member knows who
-# to appeal to. Rotector-based bans say so; ban-evasion bans come from Collapse's own records instead.
+# to appeal to. Each source's bans name that source; ban-evasion bans come from Collapse's own records instead.
 DEFAULT_BAN_DM = (
     "You have been removed from {server}.\n\n"
     "The Roblox account linked to your Discord profile ({roblox_username}) is listed as \"{status}\" by "
     "Rotector, which this server uses to screen members. If you think the listing is wrong, you can "
     "appeal it with Rotector at https://rotector.com.\n\n"
+    "{appeal}"
+)
+
+# Every other Rayward source (RCR, TASE, RAB, ...): {source} and {source_appeal} name the one this ban is
+# based on (RAYWARD_SOURCES in core/flags.py).
+DEFAULT_BAN_DM_OTHER = (
+    "You have been removed from {server}.\n\n"
+    "The Roblox account linked to your Discord profile ({roblox_username}) is listed as \"{status}\" by "
+    "{source}, which this server uses to screen members. If you think the listing is wrong, you can "
+    "appeal it with {source} at {source_appeal}.\n\n"
     "{appeal}"
 )
 

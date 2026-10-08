@@ -175,7 +175,7 @@ class SweepRunner:
         else:
             lines.append(f"Sent to review: **{c[Bucket.REVIEW.value]}**")
         lines.append(f"Unverified: **{c[Bucket.INCONCLUSIVE.value]}**")
-        lines.append("-# Rotector via Rayward")
+        lines.append("-# Rotector, RCR, TASE, RAB, Okappiki and ServerSweep via Rayward")
         return "\n".join(lines)
 
     async def _post_summary(self, sweep: SweepRow) -> None:

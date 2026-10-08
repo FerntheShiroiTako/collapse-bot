@@ -1,8 +1,8 @@
 # Collapse
 
 Discord bot that works out each member's Roblox account (from **Bloxlink**, falling back to a
-`nickname (@robloxusername)` server nickname), checks it against **Rotector** flag data through the **Rayward**
-API, and puts anything worth a look in front of a moderator.
+`nickname (@robloxusername)` server nickname), checks it against every flag source on the **Rayward** API
+(Rotector, RCR, TASE, RAB, Okappiki and ServerSweep), and puts anything worth a look in front of a moderator.
 
 **The bot never bans anyone on its own.** Every flagged account is posted to the mod channel with
 **Ban** / **Dismiss** buttons, and a ban happens only when a mod presses Ban.
@@ -83,10 +83,10 @@ cp .env.example .env                # then fill it in; `python -m banbot genkey`
 | `RETRY_MAX_RETRIES`, `RETRY_BASE_DELAY_S`, `RETRY_MAX_DELAY_S`, `RETRY_POLL_INTERVAL_S` | Inconclusive-bucket retries (exponential backoff) |
 | `MESSAGES_FILE` | One text file (default `messages.txt`, in this folder) holding the welcome post and the default ban DM, each under its own `[section]`; missing sections fall back to built-in text. Read at startup, so restart after editing. |
 | `DB_PATH` | SQLite file (default `data/banbot.sqlite3`, relative to this folder), shared by every server and isolated internally by guild id |
-| `RAW_RETENTION_HOURS` | After this, Rotector's reasons and raw response are deleted from the database and from case messages (Rayward's terms: 24 h at most, so this can't be set higher). The cleanup runs every 10 minutes and acts early enough that nothing passes the limit. |
+| `RAW_RETENTION_HOURS` | After this, the flag reasons and raw response are deleted from the database and from case messages (Rayward's terms: 24 h at most, so this can't be set higher). The cleanup runs every 10 minutes and acts early enough that nothing passes the limit. |
 | `REMOVED_GUILD_RETENTION_DAYS` | Days (default 30) after the bot is removed from a server before everything stored about it is deleted. Its API keys are wiped straight away. |
 
-**Terms and privacy:** the site has a terms of service (`#terms`) and privacy policy (`#privacy`). Put their full URLs, `https://collapseproject.uk/#terms` and `https://collapseproject.uk/#privacy`, in the Developer Portal under General Information. The bot follows Rayward's terms (rayward.app/terms): Rotector details are deleted after 24 hours (`RAW_RETENTION_HOURS` can't exceed 24), Ban checks Rotector again before banning, and ban DMs name the source.
+**Terms and privacy:** the site has a terms of service (`#terms`) and privacy policy (`#privacy`). Put their full URLs, `https://collapseproject.uk/#terms` and `https://collapseproject.uk/#privacy`, in the Developer Portal under General Information. The bot follows Rayward's terms (rayward.app/terms): flag details are deleted after 24 hours (`RAW_RETENTION_HOURS` can't exceed 24), Ban checks every source again before banning, and ban DMs name the source the ban is based on.
 
 **Discord developer portal, once:** enable the **Server Members Intent** under Bot → Privileged Gateway
 Intents. It's required; without it the bot can't see who's actually in a server to check them. Then generate
@@ -163,19 +163,28 @@ lands after the quota is gone, the member is parked until the reset without usin
 At sweep start, if the member count exceeds today's remaining budget, the bot posts how many days the sweep will
 take. `/sweep status` shows the live count.
 
-**2. Look the account up on Rotector** (`POST /v2/lookup/rotector/roblox/user`, batched, max 100 ids, using
-*this server's own* Rayward key). The whole status mapping is the `FLAG_TYPES` table in
-[banbot/integrations/rotector.py](banbot/integrations/rotector.py):
+**2. Look the account up on every Rayward source**: Rotector, RCR, TASE, RAB, Okappiki and ServerSweep
+(`POST /v2/lookup/<source>/roblox/user` for each, batched, max 100 ids, all using *this server's own* Rayward key).
+The list, with each source's name and appeal link, is `RAYWARD_SOURCES` in [banbot/core/flags.py](banbot/core/flags.py).
+All six share one status mapping, the `FLAG_TYPES` table in
+[banbot/integrations/rayward.py](banbot/integrations/rayward.py). The others return a subset of Rotector's
+statuses: RCR 0, 1, 2 and 5; TASE, RAB, Okappiki and ServerSweep only 0 and 2.
 
-| Rotector `flagType` | As shipped | With report-only mode on |
+| `flagType` | As shipped | With report-only mode on |
 |---|---|---|
 | 0 Unflagged | Clear – no action | Nothing (counted as Clear) |
 | 2 Confirmed | **Review queue, with buttons** | Posted to mod channel |
-| 1 Flagged, 5 Mixed, 3 Queued, 4 Provisional Flag, 8 Redacted | **Review queue, with buttons** | Posted to mod channel |
+| 1 Flagged, 5 Mixed, 3 Queued, 4 Provisional Flag, 8 Redacted, 10 Awaiting Human Review | **Review queue, with buttons** | Posted to mod channel |
 | 6 Past Offender | Allowed, logged only | Posted to mod channel (informational) |
 | error / timeout / 503 / missing / anything else | Inconclusive → retried → review queue | Inconclusive → retried → posted if still unverified |
 
 Unknown `flagType` values are logged at ERROR and treated as inconclusive, never as clean.
+
+When the sources disagree, the most serious answer wins (`combine()` in
+[banbot/core/flags.py](banbot/core/flags.py)): Confirmed, then Flagged/Mixed/etc., then *couldn't check*, then
+Past Offender, then Unflagged. So a flag from **any** source goes to the mods, and an account that one source can't check is retried, never
+treated as clean, even if every other source says Unflagged. The case names the source that flagged it, and
+lists any other sources that flag it too.
 
 **3. A mod presses Ban** → the member is DMed, then banned, then an audit record is written. Nothing else bans.
 
@@ -187,7 +196,7 @@ Discord bots have no access to IP addresses at all. That's Discord's own Trust &
 something any bot can see. What Collapse *can* do, and does automatically: if a member's resolved Roblox
 account was already banned in this server under a **different** Discord account, that counts as a
 Confirmed-equivalent hit: it lands in the review queue with the reason "Ban evasion" and the prior account
-named (or, in report-only mode, is posted as a notice). The Rotector flag lookup isn't even consulted for
+named (or, in report-only mode, is posted as a notice). The flag lookup isn't even consulted for
 these; a returning banned account is already reason enough.
 This runs on every join and every sweep, for every server, with no extra setup.
 
@@ -210,7 +219,7 @@ No linked account: **87**
 Past offender: **4**
 Sent to review: **21**
 Unverified: **2**
--# Rotector via Rayward
+-# Rotector, RCR, TASE, RAB, Okappiki and ServerSweep via Rayward
 ```
 
 Under report-only, `Sent to review` is replaced by `Reported`. A sweep never bans anyone, so there's no ban
@@ -272,7 +281,9 @@ before you act on them".
 
 Right before a member is banned (a mod pressed **Ban**), the bot DMs them. Each server can switch this
 off with the **Ban DM** toggle in `/config` → **Safety Modes**. The text is the `[ban_dm]` section of
-`messages.txt` (in the project root; restart the bot after editing it), falling back to a built-in default.
+`messages.txt` (in the project root; restart the bot after editing it) for a ban based on Rotector, `[ban_dm_other]`
+for one based on any other source, and `[ban_dm_evasion]` for ban evasion, each falling back to a built-in default. Ban checks
+the account again first and uses the source that flags it *now*, so the DM always names the right source.
 
 Placeholders, filled in per ban:
 
@@ -281,8 +292,10 @@ Placeholders, filled in per ban:
 | `{server}` | The guild's name |
 | `{roblox_username}` | The Roblox username the ban is based on |
 | `{roblox_id}` | The Roblox user ID |
-| `{status}` | Rotector's status for the account, e.g. `Confirmed` |
+| `{status}` | The source's status for the account, e.g. `Confirmed` |
 | `{appeal}` | "You can appeal this ban here: <link>", using the server's appeal link; empty if none is set |
+| `{source}` | `[ban_dm_other]` only: the source's name, e.g. `RCR (Roblox Criminal Records)` |
+| `{source_appeal}` | `[ban_dm_other]` only: where to appeal with that source |
 
 ### Appeal link
 
@@ -344,7 +357,7 @@ banbot/
   app.py           builds one App (pipeline, review queue, sweeps...) per server
   brand.py         product name and palette
   core/            moderation logic, no discord.py: pipeline, identity, review, enforcement, sweep, retries
-  integrations/    HTTP clients: Rayward/Rotector, Bloxlink, Roblox, shared request plumbing
+  integrations/    HTTP clients: Rayward (all six sources), Bloxlink, Roblox, shared request plumbing
   settings/        .env config, per-server settings, messages.txt handling
   storage/         SQLite store and API-key encryption
   bot/             discord.py layer: client and commands, embeds and buttons, /setup panel, /help

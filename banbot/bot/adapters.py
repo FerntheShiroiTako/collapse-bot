@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 import discord
 
 from banbot import brand
-from banbot.core.flags import FlagOutcome
+from banbot.core.flags import FlagOutcome, source_label
 from banbot.core.gateway import BanError, MemberInfo, MemberNotFound
 from banbot.core.review import REASON_BAN_EVASION
 from banbot.storage.store import ReviewRow
@@ -118,7 +118,7 @@ class DiscordGateway:
 # ---------------------------------------------------------------------- review embeds + buttons
 
 COLOR_PENDING = brand.MINT       # awaiting a decision
-COLOR_CONFIRMED = brand.SAND     # Rotector: Confirmed
+COLOR_CONFIRMED = brand.SAND     # a source's Confirmed
 COLOR_INFO = brand.UMBER         # past offender / informational
 COLOR_UNVERIFIED = brand.SAGE    # lookups failed
 COLOR_RESOLVED = brand.PINE      # closed
@@ -141,7 +141,7 @@ def _case_color(row: ReviewRow) -> discord.Color:
 
 def build_review_embed(row: ReviewRow, *, report: bool = False, resolution: str | None = None,
                        details: bool = True) -> discord.Embed:
-    """The case card. `resolution` switches it to its closed form. `details=False` leaves out Rotector's
+    """The case card. `resolution` switches it to its closed form. `details=False` leaves out the source's
     reasons, for posts Collapse can't edit later (see log_detection)."""
     kind = "Detection" if report else "Case"
     status = display_status(row)
@@ -167,7 +167,7 @@ def build_review_embed(row: ReviewRow, *, report: bool = False, resolution: str 
     e.add_field(name="Status", value=status, inline=True)
 
     e.add_field(name="Link", value=source_text(row.identity_source), inline=True)
-    e.add_field(name="Reason", value=reason_text(row.reason), inline=True)
+    e.add_field(name="Reason", value=reason_text(row.reason, row.provider), inline=True)
     if row.nickname:
         e.add_field(name="Nickname", value=row.nickname[:256], inline=True)
 
@@ -177,7 +177,7 @@ def build_review_embed(row: ReviewRow, *, report: bool = False, resolution: str 
     if resolution is not None:
         e.add_field(name="Outcome", value=resolution[:1024], inline=False)
 
-    source = brand.EVASION_SOURCE if row.provider == "banbot" else "Rotector via Rayward"
+    source = brand.EVASION_SOURCE if row.provider == "banbot" else f"{source_label(row.provider)} via Rayward"
     footer = f"{source} · {row.created_at:%d %b %Y %H:%M} UTC"
     if report:
         footer += " · report only"
@@ -186,7 +186,7 @@ def build_review_embed(row: ReviewRow, *, report: bool = False, resolution: str 
 
 
 async def strip_details(client: discord.Client, channel_id: int, message_id: int) -> None:
-    """Remove the Details field (Rotector's reasons) from an already-posted case message, keeping
+    """Remove the Details field (the source's reasons) from an already-posted case message, keeping
     everything else, including its buttons. Used once a case is older than 24 hours."""
     channel = client.get_channel(channel_id) or await client.fetch_channel(channel_id)
     message = await channel.fetch_message(message_id)  # type: ignore[union-attr]
@@ -210,14 +210,14 @@ def source_text(source: str) -> str:
     }.get(source, source)
 
 
-def reason_text(reason: str) -> str:
+def reason_text(reason: str, provider: str) -> str:
     if reason.startswith("status:"):
         status = reason.split(":", 1)[1]
         if status == "Past Offender":
             return "Previously flagged, since cleared. No action required."
-        return f"Rotector status: {status}."
+        return f"{source_label(provider)} status: {status}."
     return {
-        "confirmed_requires_review": "Rotector status: Confirmed. Awaiting approval.",
+        "confirmed_requires_review": f"{source_label(provider)} status: Confirmed. Awaiting approval.",
         "inconclusive_exhausted": "Lookups failed repeatedly. Account status unverified.",
         "ban_evasion": "Ban evasion: Collapse already banned this Roblox account here under a different Discord account.",
     }.get(reason, reason)
@@ -334,7 +334,7 @@ class DiscordReviewPoster:
     async def log_detection(self, row: ReviewRow) -> None:
         """Archival copy in the detection-log forum, if one is configured. One thread per detection;
         never updated afterwards - it's a log, not another actionable case. Collapse keeps no reference to
-        these threads, so it couldn't remove Rotector's reasons after 24 hours as Rayward's terms require;
+        these threads, so it couldn't remove the flag reasons after 24 hours as Rayward's terms require;
         the log therefore never includes them."""
         if self._log_forum_channel_id is None:
             return

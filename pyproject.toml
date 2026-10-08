@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "collapse-bot"
 version = "0.3.0"
-description = "Collapse: Discord bot that checks members' linked Roblox accounts against Rotector flag data"
+description = "Collapse: Discord bot that checks members' linked Roblox accounts against Rayward's flag sources"
 requires-python = ">=3.12"
 dependencies = [
     "discord.py>=2.4,<3",

@@ -20,8 +20,8 @@ from banbot.bot.adapters import DiscordGateway, DiscordReviewPoster
 from banbot.core.enforcement import Banner
 from banbot.settings.guild import build_guild_config
 from banbot.core.identity import IdentityResolver
-from banbot.core.flags import FlagProvider
-from banbot.integrations.rotector import RotectorProvider
+from banbot.core.flags import RAYWARD_SOURCES, CombinedProvider, FlagProvider
+from banbot.integrations.rayward import RaywardSourceProvider
 from banbot.core.gateway import Gateway
 from banbot.integrations.net import AiohttpRequester, Throttle, ThreadedHttpRequester
 from banbot.core.pipeline import Pipeline
@@ -88,17 +88,20 @@ def build_app(
 
 def build_guild_http_clients(
     cfg: Config, session: aiohttp.ClientSession
-) -> tuple[FlagProvider, BloxlinkClient | None]:
+) -> tuple[CombinedProvider, BloxlinkClient | None]:
     """The two integrations that are keyed per-guild: Rayward (always) and Bloxlink (optional)."""
     rl = cfg.rate_limit
-    rotector_req = AiohttpRequester(
+    # One requester, so both sources share one throttle: they're the same key on the same host.
+    rayward_req = AiohttpRequester(
         session, throttle=Throttle(rl.rotector_min_interval_s), timeout_s=rl.http_timeout_s,
         max_retries=rl.http_max_retries, backoff_base_s=rl.http_backoff_base_s, backoff_max_s=rl.http_backoff_max_s,
-        name=f"rotector[{cfg.guild_id}]",
+        name=f"rayward[{cfg.guild_id}]",
     )
-    provider = RotectorProvider(
-        rotector_req, api_key=cfg.rayward_api_key, base_url=cfg.rayward_base_url, batch_size=cfg.rotector_batch_size
-    )
+    provider = CombinedProvider([
+        RaywardSourceProvider(rayward_req, source=source, api_key=cfg.rayward_api_key,
+                              base_url=cfg.rayward_base_url, batch_size=cfg.rotector_batch_size)
+        for source in RAYWARD_SOURCES
+    ])
 
     bloxlink: BloxlinkClient | None = None
     if cfg.bloxlink_api_key:
@@ -119,7 +122,7 @@ def build_shared_roblox_resolver(global_cfg: GlobalConfig, session: aiohttp.Clie
 
     On aiohttp specifically, requests to /v1/users and /v1/usernames/users have been observed to hang
     for the full timeout while curl and stdlib http.client succeed instantly against the same host from
-    the same machine - see integrations/net.py's ThreadedHttpRequester. Bloxlink and Rayward/Rotector are
+    the same machine - see integrations/net.py's ThreadedHttpRequester. Bloxlink and Rayward are
     unaffected and stay on AiohttpRequester (build_guild_http_clients, below)."""
     rl = global_cfg.rate_limit
     roblox_req = ThreadedHttpRequester(

@@ -9,7 +9,7 @@ import discord
 
 from banbot.integrations.bloxlink import BloxlinkClient, BloxlinkFailure
 from banbot.settings.config import FORUM_TAG_CATEGORIES, Config
-from banbot.core.flags import FlagProvider
+from banbot.core.flags import CombinedProvider, FlagProvider, source_label
 
 ROBLOX_TEST_USER_ID = 1  # the "Roblox" system account - always exists, safe to look up
 DISCORD_TEST_USER_ID = 1  # not a real linkable account; any non-auth answer proves the key works
@@ -22,20 +22,26 @@ class CheckResult:
     detail: str = ""
 
 
-async def check_rayward(provider: FlagProvider) -> CheckResult:
+async def check_rayward(provider: CombinedProvider) -> list[CheckResult]:
+    """One check per source, so a key that works for Rotector but isn't approved for another source says so."""
+    return [await _check_rayward_source(source) for source in provider.sources]
+
+
+async def _check_rayward_source(provider: FlagProvider) -> CheckResult:
+    name = f"Rayward API key ({source_label(provider.name)})"
     try:
         results = await provider.lookup([ROBLOX_TEST_USER_ID])
     except Exception as e:
-        return CheckResult("Rayward API key", False, f"{type(e).__name__}: {e}")
+        return CheckResult(name, False, f"{type(e).__name__}: {e}")
     r = results.get(ROBLOX_TEST_USER_ID)
     if r is None:
-        return CheckResult("Rayward API key", False, "no response for the test lookup")
+        return CheckResult(name, False, "no response for the test lookup")
     if r.outcome.value != "inconclusive":
-        return CheckResult("Rayward API key", True, "connected")
+        return CheckResult(name, True, "connected")
     low = r.detail.lower()
     if "401" in low or "403" in low or "auth" in low:
-        return CheckResult("Rayward API key", False, r.detail)
-    return CheckResult("Rayward API key", False, f"test lookup failed: {r.detail}")
+        return CheckResult(name, False, r.detail)
+    return CheckResult(name, False, f"test lookup failed: {r.detail}")
 
 
 async def check_bloxlink(bloxlink: BloxlinkClient | None) -> CheckResult | None:

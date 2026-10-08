@@ -15,17 +15,19 @@ def test_parse_sections_and_ignore_notes():
 
 def test_shipped_messages_file_has_every_section():
     found = messages.load(BOT_DIR / "messages.txt")
-    assert set(found) == {"welcome", "ban_dm", "ban_dm_evasion"}
-    assert "{appeal}" in found["ban_dm"]
+    assert set(found) == {"welcome", "ban_dm", "ban_dm_other", "ban_dm_evasion"}
+    assert "{appeal}" in found["ban_dm"] and "{appeal}" in found["ban_dm_other"]
 
 
-def test_rotector_ban_dms_name_rotector_and_evasion_dms_do_not():
+def test_each_ban_dm_names_only_its_own_source():
     # Rayward's terms: an action on its data must name the source, so the member knows who to appeal to.
     found = messages.load(BOT_DIR / "messages.txt")
     for text in (found["ban_dm"], messages.DEFAULT_BAN_DM):
-        assert "Rotector" in text and "rotector.com" in text
+        assert "Rotector" in text and "rotector.com" in text and "RCR" not in text
+    for text in (found["ban_dm_other"], messages.DEFAULT_BAN_DM_OTHER):
+        assert "{source}" in text and "{source_appeal}" in text and "Rotector" not in text
     for text in (found["ban_dm_evasion"], messages.DEFAULT_BAN_DM_EVASION):
-        assert "Rotector" not in text
+        assert "Rotector" not in text and "{source}" not in text
 
 
 def test_missing_file_falls_back(tmp_path):

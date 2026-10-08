@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from banbot.settings.config import FORUM_TAG_CATEGORIES, Config, GlobalConfig
-from banbot.settings.messages import DEFAULT_BAN_DM, DEFAULT_BAN_DM_EVASION
+from banbot.settings.messages import DEFAULT_BAN_DM, DEFAULT_BAN_DM_EVASION, DEFAULT_BAN_DM_OTHER
 
 
 @dataclass(frozen=True)
@@ -66,6 +66,7 @@ class GuildSettings:
             return None
         return {
             "rotector": texts.get("ban_dm") or DEFAULT_BAN_DM,
+            "other": texts.get("ban_dm_other") or DEFAULT_BAN_DM_OTHER,  # every other Rayward source
             "banbot": texts.get("ban_dm_evasion") or DEFAULT_BAN_DM_EVASION,
         }
 

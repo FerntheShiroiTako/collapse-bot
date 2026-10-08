@@ -1,1 +1,1 @@
-"""Discord moderation bot: Roblox nickname -> Rotector flag check -> review queue / log."""
+"""Discord moderation bot: Roblox nickname -> Rayward flag check (6 sources) -> review queue / log."""

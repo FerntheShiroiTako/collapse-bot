@@ -11,20 +11,26 @@ in /config). Placeholders, filled in per ban:
     {server}            the server's name
     {roblox_username}   the Roblox username the ban is based on
     {roblox_id}         the Roblox user ID
-    {status}            Rotector's status for the account, e.g. Confirmed
+    {status}            the source's status for the account, e.g. Confirmed
     {appeal}            "You can appeal this ban here: <link>" using the server's appeal link from
                         /config -> More Settings; empty if the server hasn't set one. If you leave
                         {appeal} out, the line is added at the end anyway when a server has a link.
 Rayward's terms require a ban based on Rotector data to name Rotector, so members know who to appeal to.
 Keep the Rotector mention and link in this message.
 
+[ban_dm_other] - DMed instead of [ban_dm] when the ban is based on any other Rayward source: RCR, TASE,
+RAB, Okappiki or ServerSweep. Same placeholders as [ban_dm], plus:
+    {source}            the source's name, e.g. RCR (Roblox Criminal Records)
+    {source_appeal}     where to appeal with that source, e.g. its Discord invite or appeal page
+Keep {source} and {source_appeal} in this message for the same reason.
+
 [ban_dm_evasion] - DMed instead of [ban_dm] when the ban is for ban evasion: Collapse banned the same
-Roblox account here before under a different Discord account. That isn't Rotector data, so this message
-must not blame Rotector. Same placeholders as [ban_dm]; {status} is always "Ban Evasion".
+Roblox account here before under a different Discord account. That isn't data from any Rayward source, so
+this message must not blame one. Same placeholders as [ban_dm]; {status} is always "Ban Evasion".
 
 
 [welcome]
-Thank you for installing **Collapse**! This will scan the members of your server for any flagged accounts from Roblox Rotector and notify your mods about the detections.
+Thank you for installing **Collapse**! This will scan the members of your server for any flagged accounts from Rayward's sources (Rotector, RCR, TASE, RAB, Okappiki and ServerSweep) and notify your mods about the detections.
 
 A server admin with **Manage Server** permissions should type in the command **/setup** to link this server's Rayward and optionally Bloxlink API keys and select a mod role/channel and sweepers.
 
@@ -37,6 +43,16 @@ Your Roblox account {roblox_username} with ID {roblox_id}, which is linked to yo
 {appeal}
 
 Rotector is a separate service, and this server has no control over its database. In case you think there is some mistake, you can appeal directly to Rotector at this link: https://rotector.com
+
+
+[ban_dm_other]
+You have been banned from {server}.
+
+Your Roblox account {roblox_username} with ID {roblox_id}, which is linked to your Discord profile, is marked as "{status}" according to the {source} database that this server uses for its checks.
+
+{appeal}
+
+{source} is a separate service, and this server has no control over its database. In case you think there is some mistake, you can appeal directly to {source} at this link: {source_appeal}
 
 
 [ban_dm_evasion]

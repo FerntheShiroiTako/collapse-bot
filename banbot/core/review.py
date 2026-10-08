@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from typing import Iterable, Protocol
 
 from banbot.core.enforcement import DECISION_MOD_APPROVED, Banner, BanOutcome, BanRequest
-from banbot.core.flags import FlagOutcome, FlagProvider, FlagResult
+from banbot.core.flags import CHECKED_SOURCES, FlagOutcome, FlagProvider, FlagResult
 from banbot.core.gateway import Gateway, MemberNotFound
 from banbot.storage.store import ReviewRow, Store
 from banbot.integrations.thumbnails import RobloxThumbnailClient
@@ -20,7 +20,7 @@ log = logging.getLogger(__name__)
 
 # Why a case was queued (stored in review_queue.reason).
 REASON_STATUS = "status"  # "status:Flagged", "status:Mixed", ... provider said review
-REASON_CONFIRMED = "confirmed_requires_review"  # Rotector Confirmed; stored value kept for existing rows
+REASON_CONFIRMED = "confirmed_requires_review"  # a source's Confirmed; stored value kept for existing rows
 REASON_INCONCLUSIVE_EXHAUSTED = "inconclusive_exhausted"
 REASON_BAN_EVASION = "ban_evasion"  # this Roblox account was already banned here under a different Discord account
 
@@ -223,22 +223,26 @@ class ReviewQueue:
 
         # Rayward's terms: flag data goes stale, and must not be kept or acted on past 24 hours. Look the
         # account up again right now and ban on that answer, never on what was stored when the case opened.
-        status_name, raw_json = row.status_name, row.raw_response_json
-        if row.provider == "rotector":
+        # The ban is attributed to whichever source flags the account now, which may not be the one that
+        # opened the case.
+        provider, status_name, raw_json = row.provider, row.status_name, row.raw_response_json
+        if row.provider != "banbot":
             fresh = await self._fresh_flag(row)
             if fresh is None:
-                return Decision(False, "Couldn't reach Rotector to confirm this account's current status, so "
+                return Decision(False, "Couldn't reach Rayward to confirm this account's current status, so "
                                        "nobody was banned. The case is still open; try again in a moment.")
             if fresh.outcome in (FlagOutcome.CLEAR, FlagOutcome.PAST_OFFENDER):
                 now = self._clock.now()
-                note = f"not banned: Rotector now lists the account as {fresh.status_name}"
+                note = f"not banned: no source flags the account any more ({fresh.status_name})"
                 if not self._store.resolve_review(review_id, status="denied", by=actor_id, at=now, note=note):
                     return Decision(False, f"Case #{review_id} has already been resolved.")
-                log.warning("review #%s: ban by %s cancelled, Rotector now says %s", review_id, actor_id, fresh.status_name)
-                await self._safe_update(row, f"Closed · Rotector now lists the account as {fresh.status_name}, so nobody was banned")
-                return Decision(True, f"Rotector now lists this account as {fresh.status_name}, so nobody was banned. "
-                                      f"Case #{review_id} is closed.")
-            status_name, raw_json = fresh.status_name, fresh.raw_json()
+                log.warning("review #%s: ban by %s cancelled, no source flags the account now (%s)",
+                            review_id, actor_id, fresh.status_name)
+                await self._safe_update(
+                    row, f"Closed · {CHECKED_SOURCES} no longer flag the account ({fresh.status_name}), so nobody was banned")
+                return Decision(True, f"{CHECKED_SOURCES} no longer flag this account ({fresh.status_name}), so nobody "
+                                      f"was banned. Case #{review_id} is closed.")
+            provider, status_name, raw_json = fresh.provider, fresh.status_name, fresh.raw_json()
 
         now = self._clock.now()
         if not self._store.resolve_review(review_id, status="approved", by=actor_id, at=now):
@@ -257,7 +261,7 @@ class ReviewQueue:
             roblox_id=row.roblox_id,
             roblox_username=row.roblox_username,
             nickname_at_ban=nickname,
-            provider=row.provider,
+            provider=provider,
             status_name=status_name,
             raw_response_json=raw_json,
             decision_path=DECISION_MOD_APPROVED,
@@ -278,13 +282,13 @@ class ReviewQueue:
         return Decision(True, reply)
 
     async def _fresh_flag(self, row: ReviewRow) -> FlagResult | None:
-        """Current Rotector answer for the case's account, or None if it can't be had right now."""
+        """Current Rayward answer for the case's account, or None if it can't be had right now."""
         if self._provider is None or row.roblox_id is None:
             return None
         try:
             found = await self._provider.lookup([row.roblox_id])
         except Exception:
-            log.exception("review #%s: fresh Rotector lookup failed", row.id)
+            log.exception("review #%s: fresh Rayward lookup failed", row.id)
             return None
         fr = found.get(row.roblox_id)
         if fr is None or fr.outcome in (FlagOutcome.INCONCLUSIVE, FlagOutcome.UNMAPPED):

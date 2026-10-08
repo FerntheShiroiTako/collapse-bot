@@ -44,7 +44,7 @@ def build_detections_csv(rows: list[ReviewRow]) -> bytes:
             r.roblox_username,
             r.roblox_id or "",
             r.status_name,
-            reason_text(r.reason),
+            reason_text(r.reason, r.provider),
             source_text(r.identity_source),
             _QUEUE_STATUS_TEXT.get(r.status, r.status),
             _fmt_dt(r.resolved_at),

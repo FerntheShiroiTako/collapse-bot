@@ -16,6 +16,7 @@ from enum import Enum
 
 from banbot.settings.messages import render_ban_dm
 from banbot import brand
+from banbot.core.flags import RAYWARD_SOURCES, source_label
 from banbot.core.gateway import BanError, Gateway
 from banbot.storage.store import Store
 from banbot.util import Clock
@@ -102,8 +103,7 @@ class Banner:
         # bot and Discord will refuse to deliver it. A failed DM never blocks the ban.
         await self._notify(req, audit_id)
 
-        source = {"rotector": "Rotector", "banbot": brand.EVASION_SOURCE}.get(req.provider, req.provider)
-        reason = f"[{brand.NAME}] {source}: {req.status_name} | roblox {req.roblox_username} ({req.roblox_id}) | {req.decision_path}"
+        reason = f"[{brand.NAME}] {source_label(req.provider)}:{req.status_name} | roblox {req.roblox_username} ({req.roblox_id}) | {req.decision_path}"
         if req.approved_by:
             reason += f" by {req.approved_by}"
         try:
@@ -130,15 +130,23 @@ class Banner:
     async def _notify(self, req: BanRequest, audit_id: int) -> None:
         if not self._dm_templates:
             return
-        template = self._dm_templates.get(req.provider) or self._dm_templates.get("rotector")
+        # The DM must name the source this ban is based on: Rotector and ban evasion have their own text,
+        # every other Rayward source shares one that names it. Never fall back to another source's text.
+        template = self._dm_templates.get(req.provider)
+        if template is None and req.provider in RAYWARD_SOURCES:
+            template = self._dm_templates.get("other")
         if not template:
+            log.warning("no ban DM template for source %r; not sending a DM", req.provider)
             return
+        source = RAYWARD_SOURCES.get(req.provider)
         text = render_ban_dm(
             template,
             server=self._gateway.guild_name(),
             roblox_username=req.roblox_username,
             roblox_id=req.roblox_id,
             status=req.status_name,
+            source=source.full_name if source else source_label(req.provider),
+            source_appeal=source.appeal if source else "",
             appeal_url=self._appeal_url,
         )
         try:

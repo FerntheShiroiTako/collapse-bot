@@ -94,8 +94,8 @@ def make_queue(tmp_path, provider_result):
     return queue, store, row, banner, poster
 
 
-def flag(outcome, name):
-    return FlagResult(outcome, "rotector", None, name, {"statusLabel": name}, "")
+def flag(outcome, name, provider="rotector"):
+    return FlagResult(outcome, provider, None, name, {"statusLabel": name}, "")
 
 
 def approve(queue, row):
@@ -107,6 +107,13 @@ def test_ban_uses_the_status_rotector_gives_now(tmp_path):
     assert approve(queue, row).ok
     assert banner.requests[0].status_name == "Flagged"  # not the 3-day-old "Confirmed"
     assert store.get_review(1, row.id).status == "approved"
+
+
+def test_ban_is_attributed_to_the_source_that_flags_the_account_now(tmp_path):
+    # The case was opened on Rotector's flag, but only RCR flags the account by the time a mod presses Ban.
+    queue, _, row, banner, _ = make_queue(tmp_path, flag(FlagOutcome.REVIEW, "Flagged", provider="rcr"))
+    assert approve(queue, row).ok
+    assert banner.requests[0].provider == "rcr"
 
 
 def test_no_ban_when_rotector_no_longer_flags_the_account(tmp_path):
@@ -170,5 +177,6 @@ def test_open_case_is_reposted_when_mod_channel_changed(tmp_path):
 def test_each_ban_source_gets_its_own_dm_text():
     templates = GuildSettings(guild_id=1).ban_dm_templates({})
     assert "Rotector" in templates["rotector"]
+    assert "{source}" in templates["other"] and "Rotector" not in templates["other"]
     assert "Rotector" not in templates["banbot"]
     assert GuildSettings(guild_id=1, ban_dm_enabled=False).ban_dm_templates({}) is None

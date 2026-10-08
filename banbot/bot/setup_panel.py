@@ -548,7 +548,7 @@ class _TestAndFinishButton(discord.ui.Button["ConfigPanel"]):
             return
 
         provider, bloxlink = build_guild_http_clients(cfg, panel.registry.session)
-        results = [await diagnostics.check_rayward(provider)]
+        results = await diagnostics.check_rayward(provider)
         bloxlink_result = await diagnostics.check_bloxlink(bloxlink)
         if bloxlink_result is not None:
             results.append(bloxlink_result)

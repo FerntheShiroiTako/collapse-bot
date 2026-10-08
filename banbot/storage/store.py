@@ -902,10 +902,10 @@ class Store:
                     self._conn.execute("ROLLBACK")
                 raise
 
-    # ------------------------------------------------------------------ retention (Rotector ToS: raw data <= 24h)
+    # ------------------------------------------------------------------ retention (Rayward ToS: raw data <= 24h)
     def redact_raw_older_than(self, cutoff: datetime, now: datetime) -> tuple[int, list[tuple[int, int]]]:
         """Rayward's terms: data from its API must not be kept for more than 24 hours. Across every guild,
-        replace raw provider JSON older than `cutoff` with the bare status, and delete the Rotector reasons
+        replace raw provider JSON older than `cutoff` with the bare status, and delete the flag reasons
         stored as a case's summary. What remains is Collapse's record of its own decision.
 
         Returns (rows touched, [(channel_id, message_id)] of posted cases whose Discord message still shows
@@ -945,7 +945,7 @@ def _reduce_raw(raw_json: str, now: datetime) -> str:
         return json.dumps({"redacted_at": now.isoformat(), "note": "raw response removed per provider retention terms"})
     reduced: dict[str, Any] = {
         "redacted_at": now.isoformat(),
-        "note": "Rotector details removed after 24 hours (Rayward terms); only the status is kept for the audit trail",
+        "note": "Flag details removed after 24 hours (Rayward terms); only the status is kept for the audit trail",
     }
     for key in ("id", "flagType", "statusLabel", "error", "provider", "status"):
         if key in raw:

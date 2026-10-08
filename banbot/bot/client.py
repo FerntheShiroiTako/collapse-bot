@@ -160,7 +160,7 @@ class BanBot(discord.Client):
     RETENTION_INTERVAL_S = 600
 
     async def _retention_loop(self) -> None:
-        """Every 10 minutes: remove Rotector's details once they're old enough (Rayward's terms allow 24 hours at
+        """Every 10 minutes: remove flag details once they're old enough (Rayward's terms allow 24 hours at
         most, and the cutoff allows for the wait between runs), and delete the data of guilds the bot left."""
         assert self.store is not None
         while True:
@@ -169,7 +169,7 @@ class BanBot(discord.Client):
                 n, to_strip = self.store.redact_raw_older_than(
                     retention_cutoff(now, self.global_cfg.raw_retention_hours, self.RETENTION_INTERVAL_S), now)
                 if n:
-                    log.info("retention: removed Rotector details from %d rows older than %dh",
+                    log.info("retention: removed flag details from %d rows older than %dh",
                               n, self.global_cfg.raw_retention_hours)
                 for channel_id, message_id in to_strip:
                     try:
@@ -280,7 +280,7 @@ class BanBot(discord.Client):
             await _open_config_panel(interaction)
 
         # -------------------------------------------------------------- /sweep
-        sweep = app_commands.Group(name="sweep", description="Check every member against Rotector",
+        sweep = app_commands.Group(name="sweep", description="Check every member against all Rayward flag sources",
                                    guild_only=True)
 
         @sweep.command(name="start", description="Start a full member sweep")
@@ -384,7 +384,7 @@ class BanBot(discord.Client):
         self.tree.add_command(sweep)
 
         # -------------------------------------------------------------- /check, /reviews, /help
-        @self.tree.command(name="check", description="Check one member against Rotector now")
+        @self.tree.command(name="check", description="Check one member against all Rayward flag sources now")
         @app_commands.describe(member="The member to check")
         @app_commands.guild_only()
         async def check(interaction: discord.Interaction, member: discord.Member) -> None:
@@ -453,7 +453,7 @@ class BanBot(discord.Client):
 
 
 RESULT_TEXT = {
-    "clear": "not flagged by Rotector.",
+    "clear": "not flagged by any Rayward source.",
     "unresolved": "no linked Roblox account found; nothing to check.",
     "past_offender": "past offender; no action.",
     "review": "sent to review.",
