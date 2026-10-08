@@ -76,6 +76,8 @@ cp .env.example .env                # then fill it in; `python -m banbot genkey`
 |---|---|
 | `DISCORD_TOKEN` | The bot's Discord application token |
 | `MASTER_KEY` | Encrypts every server's Rayward/Bloxlink keys before they're written to SQLite. Generate one with `run.bat genkey` / `./run.sh genkey` (or `python -m banbot genkey`) and keep it secret; losing it means every server has to run `/setup` again. |
+| `ROBLOX_API_ENABLED` | `false` stops every Roblox API call. Bloxlink-linked members are still checked (shown by Roblox id, not username); members identified only by a `(@username)` nickname tag can't be checked and count as having no linked account. Default `true`. |
+| `ROBLOX_THUMBNAILS_ENABLED` | `false` drops the avatar pictures on case embeds. Pictures get one 5-second attempt, so a slow Roblox never holds up a case. Default `true`. |
 | `RAYWARD_BASE_URL`, `ROBLOX_BASE_URL`, `BLOXLINK_BASE_URL` | API hosts, shared by every server |
 | `BLOXLINK_MIN_INTERVAL_S`, `BLOXLINK_DAILY_LIMIT`, `BLOXLINK_DAILY_RESERVE` | Bloxlink pacing and its 2,000 requests/UTC-day quota (tracked separately per server's own key) |
 | `SWEEP_BATCH_SIZE`, `ROBLOX_BATCH_SIZE`, `ROTECTOR_BATCH_SIZE` | Batch sizes (caps 200 / 100, verified) |
@@ -233,9 +235,16 @@ detection ever recorded, any status - see below), `/help` (command summary).
 
 Set a forum channel under `/config` → **More Settings** → **Detection log forum**, and every detection that
 would go to the review queue or a report also gets its own thread there (title: `#<id> · <roblox username> ·
-<status>`), posted once, when first detected. It's a permanent, searchable log rather than another
-actionable queue, so it's never edited or removed afterward, even once the case is resolved in the mod
-channel. Leave it unset to skip this entirely; nothing changes about how cases are handled.
+<status>`), posted once, when first detected. An open case's thread carries the same **Ban** / **Dismiss**
+buttons as the mod-channel post, acting on the same case with the same permission checks, so mods can work
+from either place. The thread is otherwise never edited or removed. Collapse keeps no reference to it, so
+when a case is resolved in the mod channel, the thread's buttons stay until someone presses one: that
+press says the case is already resolved and removes them. Leave it unset to skip this entirely; nothing
+changes about how cases are handled.
+
+**Bot owner.** The Discord user IDs in `BOT_OWNER_IDS` ([banbot/settings/config.py](banbot/settings/config.py))
+are full admins in every server the bot is in, whatever that server's settings say: `/setup` and `/config`,
+Ban/Dismiss in the mod channel and the forum, `/reviews`, `/detections`, `/check` and `/sweep`.
 
 **Tags.** Once a forum channel is set, `/config` → **More Settings** → **Detection Log Tags** lets you map
 each detection category to a tag on that forum. Create the tags themselves on the forum channel first

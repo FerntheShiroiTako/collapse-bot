@@ -53,6 +53,17 @@ def _int(env: Mapping[str, str], key: str, default: int | None = None) -> int | 
         raise ConfigError(f"{key} must be an integer, got {v!r}") from e
 
 
+def _bool(env: Mapping[str, str], key: str, default: bool) -> bool:
+    v = _str(env, key)
+    if v is None:
+        return default
+    if v.lower() in ("1", "true", "yes", "on"):
+        return True
+    if v.lower() in ("0", "false", "no", "off"):
+        return False
+    raise ConfigError(f"{key} must be true or false, got {v!r}")
+
+
 def _float(env: Mapping[str, str], key: str, default: float) -> float:
     v = _str(env, key)
     if v is None:
@@ -93,6 +104,13 @@ class RateLimitConfig:
     ban_delay_s: float = 1.0
 
 
+# Bot owners: full admin in every server the bot is in, whatever that server's own settings say. They get
+# the "master" /setup and /config tier, count as mods (Ban/Dismiss, /reviews, /detections, /check) and as
+# sweep triggers. Deliberately hardcoded rather than a per-guild setting: this is about who runs the bot,
+# not something a server admin grants.
+BOT_OWNER_IDS = frozenset({733654151107444797})
+
+
 @dataclass(frozen=True)
 class GlobalConfig:
     """Process-wide settings, loaded once at startup. Shared by every guild the bot is in."""
@@ -102,6 +120,10 @@ class GlobalConfig:
     rayward_base_url: str = "https://roscoe.rayward.app"
     roblox_base_url: str = "https://users.roblox.com"
     roblox_thumbnails_base_url: str = "https://thumbnails.roblox.com"
+    # Off: no call to users.roblox.com at all. Bloxlink-linked members are still checked by their Roblox id
+    # (shown as the id, with no username); members identified only by a nickname tag can't be checked.
+    roblox_api_enabled: bool = True
+    roblox_thumbnails_enabled: bool = True  # avatar pictures on case embeds; purely cosmetic
     bloxlink_base_url: str = "https://api.blox.link"
     bloxlink_daily_limit: int = 2000  # Bloxlink Server API quota per UTC day, per guild's own key
     bloxlink_daily_reserve: int = 200  # kept back from sweeps so member-join checks keep working all day
@@ -141,6 +163,8 @@ class GlobalConfig:
             rayward_base_url=(_str(env, "RAYWARD_BASE_URL", "https://roscoe.rayward.app") or "").rstrip("/"),
             roblox_base_url=(_str(env, "ROBLOX_BASE_URL", "https://users.roblox.com") or "").rstrip("/"),
             roblox_thumbnails_base_url=(_str(env, "ROBLOX_THUMBNAILS_BASE_URL", "https://thumbnails.roblox.com") or "").rstrip("/"),
+            roblox_api_enabled=_bool(env, "ROBLOX_API_ENABLED", True),
+            roblox_thumbnails_enabled=_bool(env, "ROBLOX_THUMBNAILS_ENABLED", True),
             bloxlink_base_url=(_str(env, "BLOXLINK_BASE_URL", "https://api.blox.link") or "").rstrip("/"),
             bloxlink_daily_limit=_int(env, "BLOXLINK_DAILY_LIMIT", 2000),
             bloxlink_daily_reserve=_int(env, "BLOXLINK_DAILY_RESERVE", 200),

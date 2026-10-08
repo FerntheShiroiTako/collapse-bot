@@ -16,7 +16,7 @@ import discord
 from discord import app_commands
 
 from banbot.app import App, AppRegistry
-from banbot.settings.config import GlobalConfig
+from banbot.settings.config import BOT_OWNER_IDS, GlobalConfig
 from banbot.bot.adapters import ApproveButton, DenyButton, nickname_of, strip_details
 from banbot.core.gateway import MemberInfo
 from banbot.settings.guild import GuildSettings
@@ -28,12 +28,6 @@ from banbot.util import utcnow
 from banbot.settings.messages import DEFAULT_WELCOME
 
 log = logging.getLogger(__name__)
-
-# Bot-owner override: always gets full /setup and /config access (the "master" tier) in every server the
-# bot is in, regardless of that server's own Master/Configurator role settings. Deliberately hardcoded
-# rather than a per-guild setting - this is about who runs the bot, not something a server admin grants.
-# It does NOT make this user a mod or a sweep trigger; those stay per-guild, set by that server's own admins.
-BOT_OWNER_IDS = frozenset({733654151107444797})
 
 
 class BanBot(discord.Client):
@@ -235,7 +229,7 @@ class BanBot(discord.Client):
 
     @staticmethod
     def _can_trigger_sweep(app: App, user: discord.User | discord.Member) -> bool:
-        if user.id in app.cfg.sweep_trigger_user_ids:
+        if user.id in BOT_OWNER_IDS or user.id in app.cfg.sweep_trigger_user_ids:
             return True
         role_id = app.cfg.sweep_trigger_role_id
         if role_id is not None and isinstance(user, discord.Member):
@@ -244,6 +238,8 @@ class BanBot(discord.Client):
 
     @staticmethod
     def _is_mod(app: App, user: discord.User | discord.Member) -> bool:
+        if user.id in BOT_OWNER_IDS:
+            return True
         return isinstance(user, discord.Member) and any(r.id == app.cfg.mod_role_id for r in user.roles)
 
     def _app_for(self, interaction: discord.Interaction) -> App | None:

@@ -53,7 +53,7 @@ def build_app(
     store: Store,
     gateway: Gateway,
     poster: ReviewPoster,
-    resolver: RobloxResolver,
+    resolver: RobloxResolver | None,
     provider: FlagProvider,
     bloxlink: BloxlinkClient | None = None,
     thumbnails: RobloxThumbnailClient | None = None,
@@ -116,7 +116,7 @@ def build_guild_http_clients(
     return provider, bloxlink
 
 
-def build_shared_roblox_resolver(global_cfg: GlobalConfig, session: aiohttp.ClientSession) -> RobloxResolver:
+def build_shared_roblox_resolver(global_cfg: GlobalConfig, session: aiohttp.ClientSession) -> RobloxResolver | None:
     """Roblox's username/id lookup takes no key and is rate-limited by source IP, not per guild, so every
     guild shares one resolver (and one throttle) instead of each hammering Roblox independently.
 
@@ -124,6 +124,8 @@ def build_shared_roblox_resolver(global_cfg: GlobalConfig, session: aiohttp.Clie
     for the full timeout while curl and stdlib http.client succeed instantly against the same host from
     the same machine - see integrations/net.py's ThreadedHttpRequester. Bloxlink and Rayward are
     unaffected and stay on AiohttpRequester (build_guild_http_clients, below)."""
+    if not global_cfg.roblox_api_enabled:
+        return None
     rl = global_cfg.rate_limit
     roblox_req = ThreadedHttpRequester(
         throttle=Throttle(rl.roblox_min_interval_s), timeout_s=rl.http_timeout_s,
@@ -133,12 +135,21 @@ def build_shared_roblox_resolver(global_cfg: GlobalConfig, session: aiohttp.Clie
     return HttpRobloxResolver(roblox_req, base_url=global_cfg.roblox_base_url, batch_size=global_cfg.roblox_batch_size)
 
 
-def build_shared_thumbnail_client(global_cfg: GlobalConfig, session: aiohttp.ClientSession) -> RobloxThumbnailClient:
-    """Same reasoning as the resolver above: no per-guild key, so one shared client and throttle."""
+def build_shared_thumbnail_client(
+    global_cfg: GlobalConfig, session: aiohttp.ClientSession
+) -> RobloxThumbnailClient | None:
+    """Same reasoning as the resolver above: no per-guild key, so one shared client and throttle, and
+    http.client rather than aiohttp, which Roblox's edge drops from this host (thumbnails.roblox.com too).
+
+    A case is posted only after its picture lookup returns, and the picture is cosmetic, so this gets one
+    attempt with a short timeout instead of the usual retries: a slow Roblox costs a case 5 seconds at
+    most, never the ~90 the retry loop took."""
+    if not (global_cfg.roblox_api_enabled and global_cfg.roblox_thumbnails_enabled):
+        return None
     rl = global_cfg.rate_limit
-    thumb_req = AiohttpRequester(
-        session, throttle=Throttle(rl.roblox_thumbnail_min_interval_s), timeout_s=rl.http_timeout_s,
-        max_retries=rl.http_max_retries, backoff_base_s=rl.http_backoff_base_s, backoff_max_s=rl.http_backoff_max_s,
+    thumb_req = ThreadedHttpRequester(
+        throttle=Throttle(rl.roblox_thumbnail_min_interval_s), timeout_s=min(rl.http_timeout_s, 5.0),
+        max_retries=0, backoff_base_s=rl.http_backoff_base_s, backoff_max_s=rl.http_backoff_max_s,
         name="roblox-thumbnails",
     )
     return HttpRobloxThumbnailClient(thumb_req, base_url=global_cfg.roblox_thumbnails_base_url)

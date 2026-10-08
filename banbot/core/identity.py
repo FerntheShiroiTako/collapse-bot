@@ -68,7 +68,7 @@ class IdentityResolver:
     def __init__(
         self,
         *,
-        resolver: RobloxResolver,
+        resolver: RobloxResolver | None,  # None: Roblox API switched off (ROBLOX_API_ENABLED=false)
         bloxlink: BloxlinkClient | None,
         gateway: Gateway,
         bloxlink_budget: DailyBudget | None = None,
@@ -97,6 +97,13 @@ class IdentityResolver:
                 out.append(Unverifiable(m, stage, None, None, link.detail))
                 continue
 
+            if isinstance(link, BloxlinkLink) and self._resolver is None:
+                # No Roblox API to fetch a username with; the id is all the flag lookup needs.
+                rid = link.roblox_id
+                user = RobloxUser(id=rid, name=str(rid), display_name=str(rid), requested_username="")
+                out.append(Identified(m, user, IdentitySource.BLOXLINK, str(rid)))
+                continue
+
             if isinstance(link, BloxlinkLink):
                 # Placeholder; the username arrives from the bulk id lookup below.
                 out.append(Unverifiable(m, STAGE_RESOLVE, None, link.roblox_id, "awaiting username lookup"))
@@ -111,6 +118,9 @@ class IdentityResolver:
                 out.append(Unidentified(m, detail))
                 continue
             username = parsed.username  # type: ignore[assignment]
+            if self._resolver is None:
+                out.append(Unidentified(m, "Roblox API is switched off, so nickname tags can't be looked up"))
+                continue
             out.append(Unverifiable(m, STAGE_RESOLVE, username, None, "awaiting username resolution"))
             pending_names.setdefault(username.lower(), []).append(idx)
 

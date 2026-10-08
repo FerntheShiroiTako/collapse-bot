@@ -12,6 +12,7 @@ from typing import Iterable, Protocol
 from banbot.core.enforcement import DECISION_MOD_APPROVED, Banner, BanOutcome, BanRequest
 from banbot.core.flags import CHECKED_SOURCES, FlagOutcome, FlagProvider, FlagResult
 from banbot.core.gateway import Gateway, MemberNotFound
+from banbot.settings.config import BOT_OWNER_IDS
 from banbot.storage.store import ReviewRow, Store
 from banbot.integrations.thumbnails import RobloxThumbnailClient
 from banbot.util import Clock
@@ -205,11 +206,11 @@ class ReviewQueue:
         return self._store.pending_reviews(self._guild_id)
 
     # ---------------------------------------------------------------- decisions
-    def can_moderate(self, role_ids: Iterable[int]) -> bool:
-        return self._mod_role_id in set(role_ids)
+    def can_moderate(self, role_ids: Iterable[int], actor_id: int | None = None) -> bool:
+        return actor_id in BOT_OWNER_IDS or self._mod_role_id in set(role_ids)
 
     async def approve(self, review_id: int, *, actor_id: int, actor_role_ids: Iterable[int]) -> Decision:
-        if not self.can_moderate(actor_role_ids):
+        if not self.can_moderate(actor_role_ids, actor_id):
             log.warning("review #%s: approve attempt by non-mod %s rejected", review_id, actor_id)
             return Decision(False, "You don't have permission to do that.")
         if self.report_only:
@@ -296,7 +297,7 @@ class ReviewQueue:
         return fr
 
     async def deny(self, review_id: int, *, actor_id: int, actor_role_ids: Iterable[int]) -> Decision:
-        if not self.can_moderate(actor_role_ids):
+        if not self.can_moderate(actor_role_ids, actor_id):
             log.warning("review #%s: deny attempt by non-mod %s rejected", review_id, actor_id)
             return Decision(False, "You don't have permission to do that.")
         row = self._store.get_review(self._guild_id, review_id)

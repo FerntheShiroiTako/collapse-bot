@@ -17,7 +17,7 @@ from banbot.core.review import REASON_BAN_EVASION
 from banbot.storage.store import ReviewRow
 
 if TYPE_CHECKING:
-    from banbot.app import AppRegistry
+    from banbot.app import App, AppRegistry
 
 log = logging.getLogger(__name__)
 
@@ -258,7 +258,7 @@ class _ReviewButton(discord.ui.DynamicItem[discord.ui.Button], template=r"banbot
         user = interaction.user
         role_ids = [r.id for r in user.roles] if isinstance(user, discord.Member) else []
         # Cheap server-side gate before deferring, so non-mods get an instant ephemeral "not allowed".
-        if not app.review_queue.can_moderate(role_ids):
+        if not app.review_queue.can_moderate(role_ids, user.id):
             await interaction.response.send_message("You don't have permission to do that.", ephemeral=True)
             return
         await interaction.response.defer(ephemeral=True, thinking=True)
@@ -267,6 +267,21 @@ class _ReviewButton(discord.ui.DynamicItem[discord.ui.Button], template=r"banbot
         else:
             decision = await app.review_queue.deny(self.review_id, actor_id=user.id, actor_role_ids=role_ids)
         await interaction.followup.send(decision.message, ephemeral=True)
+        await _drop_buttons_if_closed(app, interaction, self.review_id)
+
+
+async def _drop_buttons_if_closed(app: App, interaction: discord.Interaction, review_id: int) -> None:
+    """The mod-channel post is closed by ReviewQueue itself; this catches the other copy (the forum log
+    thread), which Collapse holds no reference to, once the case is resolved."""
+    row = app.store.get_review(app.cfg.guild_id, review_id)
+    if row is None or row.status == "pending" or interaction.message is None:
+        return
+    if (row.channel_id, row.message_id) == (interaction.channel_id, interaction.message.id):
+        return  # the mod-channel post; already updated to its closed form
+    try:
+        await interaction.message.edit(view=None)
+    except discord.HTTPException as e:
+        log.info("case #%s: could not remove buttons from message %s (%s)", review_id, interaction.message.id, e)
 
 
 class ApproveButton(_ReviewButton, template=r"banbot:review:(?P<id>[0-9]+):(?P<action>approve)"):
@@ -332,10 +347,11 @@ class DiscordReviewPoster:
         await msg.edit(embed=build_review_embed(row, resolution=resolution), view=None)
 
     async def log_detection(self, row: ReviewRow) -> None:
-        """Archival copy in the detection-log forum, if one is configured. One thread per detection;
-        never updated afterwards - it's a log, not another actionable case. Collapse keeps no reference to
-        these threads, so it couldn't remove the flag reasons after 24 hours as Rayward's terms require;
-        the log therefore never includes them."""
+        """Copy in the detection-log forum, if one is configured. One thread per detection. An open case
+        gets the same Ban/Dismiss buttons as the mod-channel post, acting on the same case. Collapse keeps
+        no reference to these threads, so it can't update them when the case is resolved elsewhere: their
+        buttons go away the next time someone presses one (see _ReviewButton.callback), and the post never
+        includes the flag reasons, which Rayward's terms say must be removed after 24 hours."""
         if self._log_forum_channel_id is None:
             return
         forum = await self._gateway._forum_channel(self._log_forum_channel_id)
@@ -347,6 +363,7 @@ class DiscordReviewPoster:
                 embed=build_review_embed(row, report=(row.status == "reported"), details=False),
                 allowed_mentions=discord.AllowedMentions.none(),
                 applied_tags=self._applied_tags(forum, row),
+                view=ReviewView(row.id) if row.status == "pending" else discord.utils.MISSING,
             )
         except discord.HTTPException:
             log.exception("failed to log detection #%s to the forum", row.id)
