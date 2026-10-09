@@ -68,6 +68,7 @@ class BanBot(discord.Client):
     async def on_ready(self) -> None:
         assert self.registry is not None and self.store is not None
         log.warning("logged in as %s (%s), in %d guild(s)", self.user, self.user.id if self.user else "?", len(self.guilds))
+        await self._update_presence()  # also on reconnect: the gateway forgets it
         if self._bg_tasks:
             return  # reconnect, not first start
         for guild_id in self.store.configured_guild_ids():
@@ -102,6 +103,7 @@ class BanBot(discord.Client):
             self.store.clear_guild_removed(guild.id)  # back before its data was deleted; keys must be re-entered
         await self._clear_guild_commands(guild)
         await self._send_welcome(guild)
+        await self._update_presence()
 
     async def on_guild_remove(self, guild: discord.Guild) -> None:
         log.warning("removed from guild %s (%s); its API keys are wiped and its data is deleted in %d days",
@@ -113,6 +115,15 @@ class BanBot(discord.Client):
             self.store.mark_guild_removed(guild.id, utcnow())
         if self.registry is not None:
             self.registry.invalidate(guild.id)
+        await self._update_presence()
+
+    async def _update_presence(self) -> None:
+        n = len(self.guilds)
+        try:
+            await self.change_presence(activity=discord.CustomActivity(
+                name=f"Protecting {n:,} server{'s' if n != 1 else ''}"))
+        except Exception:
+            log.exception("could not update presence")  # cosmetic; never let it break a guild event
 
     async def _clear_guild_commands(self, guild: discord.abc.Snowflake) -> None:
         try:
