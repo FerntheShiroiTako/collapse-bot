@@ -110,6 +110,7 @@ class RateLimitConfig:
 # sweep triggers. Deliberately hardcoded rather than a per-guild setting: this is about who runs the bot,
 # not something a server admin grants.
 BOT_OWNER_IDS = frozenset({733654151107444797})
+ANNOUNCER_ID = 733654151107444797  # the only user who can /announce to every server
 
 
 @dataclass(frozen=True)

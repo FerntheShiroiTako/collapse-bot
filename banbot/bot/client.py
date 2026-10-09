@@ -16,10 +16,11 @@ import discord
 from discord import app_commands
 
 from banbot.app import App, AppRegistry
-from banbot.settings.config import BOT_OWNER_IDS, GlobalConfig
+from banbot.settings.config import ANNOUNCER_ID, BOT_OWNER_IDS, GlobalConfig
 from banbot.bot.adapters import ApproveButton, DenyButton, nickname_of, strip_details
 from banbot.core.gateway import MemberInfo
 from banbot.settings.guild import GuildSettings
+from banbot.bot.announce import STYLE_EMBED, STYLE_PLAIN, AnnounceModal
 from banbot.bot.help import send_help
 from banbot.bot.reviews import build_detections_csv, send_reviews, send_username_list
 from banbot.bot.setup_panel import open_panel
@@ -459,6 +460,23 @@ class BanBot(discord.Client):
             file = discord.File(io.BytesIO(csv_bytes), filename=f"detections-{app.cfg.guild_id}.csv")
             await interaction.response.send_message(
                 f"{len(rows)} detection(s) recorded since setup.", file=file, ephemeral=True)
+
+        # -------------------------------------------------------------- /announce (owner only, DMs)
+        @self.tree.command(name="announce", description="Developer only: post a message to every server")
+        @app_commands.describe(style="Embed or plain text")
+        @app_commands.choices(style=[
+            app_commands.Choice(name="Embed", value=STYLE_EMBED),
+            app_commands.Choice(name="Plain text", value=STYLE_PLAIN),
+        ])
+        @app_commands.allowed_installs(guilds=True, users=False)
+        @app_commands.allowed_contexts(guilds=False, dms=True, private_channels=False)
+        async def announce(interaction: discord.Interaction, style: app_commands.Choice[str]) -> None:
+            if interaction.user.id != ANNOUNCER_ID:
+                await interaction.response.send_message("You don't have permission to do that.")
+                return
+            assert bot.store is not None
+            await interaction.response.send_modal(
+                AnnounceModal(style.value, lambda: list(bot.guilds), bot.store))
 
         @self.tree.command(name="help", description="How Collapse works, by topic")
         async def help_cmd(interaction: discord.Interaction) -> None:
