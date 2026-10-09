@@ -121,6 +121,13 @@ class ReviewQueue:
         if not created:
             log.info("report #%s already posted for discord=%s roblox=%s status=%s (seen %d times); not re-posting",
                      row.id, case.discord_id, case.roblox_id, case.flag.status_name, row.seen_count)
+            # Same as enqueue: the earlier notice may never have reached Discord, or may sit in a channel that's
+            # no longer the mod channel. Either way nobody would see it, so post it again.
+            mod_channel = getattr(self._poster, "channel_id", None)
+            if row.message_id is None or (mod_channel is not None and row.channel_id != mod_channel):
+                log.warning("report #%s: re-posting to the current mod channel (was in %s)", row.id, row.channel_id)
+                await self._post_report(row)
+                row = self._store.get_review(self._guild_id, row.id) or row
             return row, False
         log.warning("report #%s: discord=%s roblox=%s (%s) status=%s reason=%s",
                     row.id, case.discord_id, case.roblox_id, case.roblox_username, case.flag.status_name, case.reason)

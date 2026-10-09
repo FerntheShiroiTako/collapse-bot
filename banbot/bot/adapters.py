@@ -314,6 +314,7 @@ class DiscordReviewPoster:
     async def post(self, row: ReviewRow) -> tuple[int, int] | None:
         ch = await self._gateway._channel(self._channel_id)
         if ch is None:
+            log.warning("review #%s: mod channel %s not found or not accessible; not posted", row.id, self._channel_id)
             return None
         msg = await ch.send(
             embed=build_review_embed(row),
@@ -325,6 +326,7 @@ class DiscordReviewPoster:
     async def post_report(self, row: ReviewRow) -> tuple[int, int] | None:
         ch = await self._gateway._channel(self._channel_id)
         if ch is None:
+            log.warning("report #%s: mod channel %s not found or not accessible; not posted", row.id, self._channel_id)
             return None
         msg = await ch.send(
             embed=build_review_embed(row, report=True),

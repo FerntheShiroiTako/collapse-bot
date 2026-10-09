@@ -86,7 +86,8 @@ cp .env.example .env                # then fill it in; `python -m banbot genkey`
 | `MESSAGES_FILE` | One text file (default `messages.txt`, in this folder) holding the welcome post and the default ban DM, each under its own `[section]`; missing sections fall back to built-in text. Read at startup, so restart after editing. |
 | `DB_PATH` | SQLite file (default `data/banbot.sqlite3`, relative to this folder), shared by every server and isolated internally by guild id |
 | `RAW_RETENTION_HOURS` | After this, the flag reasons and raw response are deleted from the database and from case messages (Rayward's terms: 24 h at most, so this can't be set higher). The cleanup runs every 10 minutes and acts early enough that nothing passes the limit. |
-| `REMOVED_GUILD_RETENTION_DAYS` | Days (default 30) after the bot is removed from a server before everything stored about it is deleted. Its API keys are wiped straight away. |
+| `REMOVED_GUILD_RETENTION_DAYS` | Days (default 30, at most 30) after the bot is removed from a server before everything stored about it is deleted. Its API keys are wiped straight away. |
+| `DATA_RETENTION_DAYS` | Days (default 30, at most 30) after which cases, reports, audit rows, recorded bans, inconclusive checks, sweep results and API usage counters are deleted, counted from each row's last update. Server settings are kept while the bot is in the server. Ban-evasion detection only covers bans from within this window. |
 
 **Terms and privacy:** the site has a terms of service (`#terms`) and privacy policy (`#privacy`). Put their full URLs, `https://collapseproject.uk/#terms` and `https://collapseproject.uk/#privacy`, in the Developer Portal under General Information. The bot follows Rayward's terms (rayward.app/terms): flag details are deleted after 24 hours (`RAW_RETENTION_HOURS` can't exceed 24), Ban checks every source again before banning, and ban DMs name the source the ban is based on.
 

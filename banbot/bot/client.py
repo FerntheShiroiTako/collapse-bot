@@ -155,7 +155,8 @@ class BanBot(discord.Client):
 
     async def _retention_loop(self) -> None:
         """Every 10 minutes: remove flag details once they're old enough (Rayward's terms allow 24 hours at
-        most, and the cutoff allows for the wait between runs), and delete the data of guilds the bot left."""
+        most, and the cutoff allows for the wait between runs), delete everything else once it's
+        DATA_RETENTION_DAYS old, and delete the data of guilds the bot left."""
         assert self.store is not None
         while True:
             try:
@@ -171,6 +172,11 @@ class BanBot(discord.Client):
                     except discord.HTTPException as e:
                         # Deleted message or lost access: nothing of ours left to edit.
                         log.info("retention: could not edit case message %s in %s (%s)", message_id, channel_id, e)
+                aged = self.store.purge_older_than(
+                    retention_cutoff(now, self.global_cfg.data_retention_days * 24, self.RETENTION_INTERVAL_S))
+                if any(aged.values()):
+                    log.info("retention: deleted rows older than %d days: %s",
+                             self.global_cfg.data_retention_days, {k: v for k, v in aged.items() if v})
                 gone = now - timedelta(days=self.global_cfg.removed_guild_retention_days)
                 for guild_id in self.store.guilds_removed_before(gone):
                     counts = self.store.purge_guild(guild_id)

@@ -18,6 +18,7 @@ from typing import Mapping
 
 ROBLOX_USERNAMES_BATCH_CAP = 200  # verified empirically: 201 usernames -> 400 "Too many usernames"
 ROTECTOR_BATCH_CAP = 100  # per Rayward OpenAPI spec (ids maxItems: 100)
+MAX_RETENTION_DAYS = 30  # the privacy policy says nothing is kept longer than this
 
 # Detection categories a forum tag can be mapped to (bot/setup_panel.py's tag-mapping panel, bot/adapters.py's
 # thread tagging). Admins map each one to a tag they've already created on the forum channel; a category
@@ -133,6 +134,7 @@ class GlobalConfig:
     rotector_batch_size: int = 100
     raw_retention_hours: int = 24
     removed_guild_retention_days: int = 30  # how long a removed guild's data is kept before it's deleted
+    data_retention_days: int = 30  # cases, audit rows, bans, sweep results etc. are deleted this long after their last update
     retry: RetryConfig = field(default_factory=RetryConfig)
     rate_limit: RateLimitConfig = field(default_factory=RateLimitConfig)
 
@@ -149,8 +151,10 @@ class GlobalConfig:
             raise ConfigError("BLOXLINK_DAILY_LIMIT must be >= 1")
         if not (0 <= self.bloxlink_daily_reserve < self.bloxlink_daily_limit):
             raise ConfigError("BLOXLINK_DAILY_RESERVE must be >= 0 and below BLOXLINK_DAILY_LIMIT")
-        if self.removed_guild_retention_days < 1:
-            raise ConfigError("REMOVED_GUILD_RETENTION_DAYS must be >= 1")
+        if not (1 <= self.removed_guild_retention_days <= MAX_RETENTION_DAYS):
+            raise ConfigError(f"REMOVED_GUILD_RETENTION_DAYS must be 1..{MAX_RETENTION_DAYS}: the privacy policy promises no longer")
+        if not (1 <= self.data_retention_days <= MAX_RETENTION_DAYS):
+            raise ConfigError(f"DATA_RETENTION_DAYS must be 1..{MAX_RETENTION_DAYS}: the privacy policy promises no longer")
         if not (1 <= self.raw_retention_hours <= 24):
             raise ConfigError("RAW_RETENTION_HOURS must be 1..24: Rayward's terms forbid keeping its data longer")
 
@@ -174,6 +178,7 @@ class GlobalConfig:
             rotector_batch_size=_int(env, "ROTECTOR_BATCH_SIZE", 100),
             raw_retention_hours=_int(env, "RAW_RETENTION_HOURS", 24),
             removed_guild_retention_days=_int(env, "REMOVED_GUILD_RETENTION_DAYS", 30),
+            data_retention_days=_int(env, "DATA_RETENTION_DAYS", 30),
             retry=RetryConfig(
                 max_retries=_int(env, "RETRY_MAX_RETRIES", 5),
                 base_delay_s=_float(env, "RETRY_BASE_DELAY_S", 30.0),

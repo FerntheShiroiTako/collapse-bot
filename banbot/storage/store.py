@@ -880,8 +880,28 @@ class Store:
             out["sweep trigger lists"] = triggers
         return out
 
+    def purge_older_than(self, cutoff: datetime, *, dry_run: bool = False) -> dict[str, int]:
+        """Across every guild, delete what was last touched before `cutoff`: cases and reports, audit rows,
+        recorded bans, inconclusive checks, sweep results and finished sweeps, and API usage counters.
+        Guild settings are kept while the bot is in the guild (they're deleted with the guild otherwise).
+        Returns rows per table; with dry_run, only counts them."""
+        steps = [
+            ("sweep_results", "FROM sweep_results WHERE updated_at < ?"),
+            ("sweeps", "FROM sweeps WHERE active IS NULL AND COALESCE(finished_at, started_at) < ? "
+                       "AND id NOT IN (SELECT sweep_id FROM sweep_results)"),
+            ("review_queue", "FROM review_queue WHERE COALESCE(resolved_at, last_seen_at, created_at) < ?"),
+            ("inconclusive", "FROM inconclusive WHERE first_seen_at < ?"),
+            ("audit_log", "FROM audit_log WHERE created_at < ?"),
+            ("bans_applied", "FROM bans_applied WHERE banned_at < ?"),
+        ]
+        with self._transaction(dry_run) as conn:
+            out = {label: self._count_and_delete(conn, label, frm, _ts(cutoff), dry_run) for label, frm in steps}
+            out["api_usage"] = self._count_and_delete(
+                conn, "api_usage", "FROM api_usage WHERE day < ?", cutoff.date().isoformat(), dry_run)
+        return out
+
     @staticmethod
-    def _count_and_delete(conn: sqlite3.Connection, label: str, frm: str, param: int, dry_run: bool) -> int:
+    def _count_and_delete(conn: sqlite3.Connection, label: str, frm: str, param: int | str, dry_run: bool) -> int:
         n = conn.execute(f"SELECT COUNT(*) {frm}", (param,)).fetchone()[0]
         if n and not dry_run:
             conn.execute(f"DELETE {frm}", (param,))

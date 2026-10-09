@@ -139,3 +139,21 @@ def test_purge_commands_ask_for_confirmation(tmp_path):
     check = Store(db); assert rows(check, "review_queue", 1) == 0; check.close()
 
     assert run("purge-guild", "abc").returncode == 2  # not a number: shows usage instead of guessing
+
+
+def test_rows_older_than_the_cutoff_are_deleted_and_settings_kept(store):
+    fill(store, 1)
+    assert not any(store.purge_older_than(NOW).values())  # nothing is older than now
+    counts = store.purge_older_than(NOW + timedelta(days=31))
+    for table in ("review_queue", "inconclusive", "audit_log", "bans_applied", "api_usage", "sweep_results"):
+        assert counts[table] >= 1 and rows(store, table, None if table == "sweep_results" else 1) == 0, table
+    assert rows(store, "guild_settings", 1) == 1
+    assert rows(store, "sweeps", 1) == 1  # still active: a running sweep is never deleted
+
+
+def test_finished_sweeps_go_once_their_results_have(store):
+    fill(store, 1)
+    sweep = store.get_active_sweep(1)
+    store.finish_sweep(sweep.id, finished_at=NOW, status="finished", counts={})
+    assert store.purge_older_than(NOW + timedelta(days=31))["sweeps"] == 1
+    assert rows(store, "sweeps", 1) == 0
