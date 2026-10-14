@@ -30,7 +30,7 @@ this message must not blame one. Same placeholders as [ban_dm]; {status} is alwa
 
 
 [welcome]
-Thank you for installing **Collapse**! This will scan the members of your server for any flagged accounts from Rayward's sources (Rotector, RCR, TASE, RAB, Okappiki and ServerSweep) and notify your mods about the detections.
+Thank you for installing **Collapse**! This will scan the members of your server for any flagged accounts from Rayward's sources (Rotector, RCR, RAB, Okappiki and ServerSweep) and notify your mods about the detections.
 
 A server admin with **Manage Server** permissions should type in the command **/setup** to link this server's Rayward and optionally Bloxlink API keys and select a mod role/channel and sweepers.
 

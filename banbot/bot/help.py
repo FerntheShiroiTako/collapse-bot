@@ -6,12 +6,13 @@ from __future__ import annotations
 import discord
 
 from banbot import brand
+from banbot.core.flags import active_sources_text
 
 TOPICS: dict[str, tuple[str, str]] = {
     "overview": (
         "Overview",
         "Collapse looks up the Roblox account linked to each member and checks it against every flag "
-        "source on Rayward: Rotector, RCR, TASE, RAB, Okappiki and ServerSweep. Flagged accounts are "
+        "source on Rayward: {sources}. Flagged accounts are "
         "posted to your mod channel with Ban and Dismiss buttons. The bot never bans anyone on its own; a ban only happens "
         "when a mod presses Ban.\n\n"
         "A lookup that fails or times out is treated as unknown, and the member is checked again later. "
@@ -77,6 +78,7 @@ DEFAULT_TOPIC = "overview"
 
 def _embed(topic: str) -> discord.Embed:
     title, body = TOPICS[topic]
+    body = body.replace("{sources}", active_sources_text())  # whatever /sources has switched on right now
     e = discord.Embed(title=f"{brand.NAME} help: {title}", description=body, color=brand.SAGE)
     e.set_footer(text="Pick a topic below for more.")
     return e

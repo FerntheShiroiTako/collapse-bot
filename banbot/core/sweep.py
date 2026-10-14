@@ -14,6 +14,7 @@ import logging
 from collections import Counter
 
 from banbot.settings.config import Config
+from banbot.core.flags import active_sources_text
 from banbot.core.gateway import Gateway
 from banbot.core.pipeline import Bucket, Pipeline
 from banbot.core.retrier import InconclusiveRetrier
@@ -175,7 +176,7 @@ class SweepRunner:
         else:
             lines.append(f"Sent to review: **{c[Bucket.REVIEW.value]}**")
         lines.append(f"Unverified: **{c[Bucket.INCONCLUSIVE.value]}**")
-        lines.append("-# Rotector, RCR, TASE, RAB, Okappiki and ServerSweep via Rayward")
+        lines.append(f"-# {active_sources_text()} via Rayward")
         return "\n".join(lines)
 
     async def _post_summary(self, sweep: SweepRow) -> None:

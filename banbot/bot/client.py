@@ -16,11 +16,13 @@ import discord
 from discord import app_commands
 
 from banbot.app import App, AppRegistry
-from banbot.settings.config import ANNOUNCER_ID, BOT_OWNER_IDS, GlobalConfig
+from banbot.settings.config import DEVELOPER_ID, BOT_OWNER_IDS, GlobalConfig
 from banbot.bot.adapters import ApproveButton, DenyButton, nickname_of, strip_details
 from banbot.core.gateway import MemberInfo
 from banbot.settings.guild import GuildSettings
 from banbot.bot.announce import STYLE_EMBED, STYLE_PLAIN, AnnounceModal
+from banbot.bot.sources_panel import open_sources_panel
+from banbot.core.flags import active_sources_text, set_disabled_sources
 from banbot.bot.help import send_help
 from banbot.bot.reviews import build_detections_csv, send_reviews, send_username_list
 from banbot.bot.setup_panel import open_panel
@@ -51,6 +53,8 @@ class BanBot(discord.Client):
     async def setup_hook(self) -> None:
         self._session = aiohttp.ClientSession(headers={"User-Agent": "Collapse/0.2 (discord moderation bot)"})
         self.store = Store(self.global_cfg.db_path, master_key=self.global_cfg.master_key)
+        set_disabled_sources(self.store.disabled_sources())  # what /sources last switched off
+        log.warning("flag sources on: %s", active_sources_text())
         self.registry = AppRegistry(
             client=self, global_cfg=self.global_cfg, store=self.store, session=self._session,
             texts=self.texts,
@@ -463,20 +467,33 @@ class BanBot(discord.Client):
 
         # -------------------------------------------------------------- /announce (owner only, DMs)
         @self.tree.command(name="announce", description="Developer only: post a message to every server")
-        @app_commands.describe(style="Embed or plain text")
+        @app_commands.describe(style="Embed or plain text",
+                               ping_mod_role="Mention each server's mod role with the announcement")
         @app_commands.choices(style=[
             app_commands.Choice(name="Embed", value=STYLE_EMBED),
             app_commands.Choice(name="Plain text", value=STYLE_PLAIN),
         ])
         @app_commands.allowed_installs(guilds=True, users=False)
         @app_commands.allowed_contexts(guilds=False, dms=True, private_channels=False)
-        async def announce(interaction: discord.Interaction, style: app_commands.Choice[str]) -> None:
-            if interaction.user.id != ANNOUNCER_ID:
+        async def announce(interaction: discord.Interaction, style: app_commands.Choice[str],
+                           ping_mod_role: bool = False) -> None:
+            if interaction.user.id != DEVELOPER_ID:
                 await interaction.response.send_message("You don't have permission to do that.")
                 return
             assert bot.store is not None
             await interaction.response.send_modal(
-                AnnounceModal(style.value, lambda: list(bot.guilds), bot.store))
+                AnnounceModal(style.value, lambda: list(bot.guilds), bot.store, ping_mod_role=ping_mod_role))
+
+        # -------------------------------------------------------------- /sources (owner only, DMs)
+        @self.tree.command(name="sources", description="Developer only: switch flag sources on or off")
+        @app_commands.allowed_installs(guilds=True, users=False)
+        @app_commands.allowed_contexts(guilds=False, dms=True, private_channels=False)
+        async def sources_cmd(interaction: discord.Interaction) -> None:
+            if interaction.user.id != DEVELOPER_ID:
+                await interaction.response.send_message("You don't have permission to do that.")
+                return
+            assert bot.store is not None
+            await open_sources_panel(interaction, bot.store)
 
         @self.tree.command(name="help", description="How Collapse works, by topic")
         async def help_cmd(interaction: discord.Interaction) -> None:

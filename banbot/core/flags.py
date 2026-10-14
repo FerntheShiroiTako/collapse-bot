@@ -6,7 +6,7 @@ import json
 import logging
 from dataclasses import dataclass, replace
 from enum import Enum
-from typing import Any, Protocol, Sequence
+from typing import Any, Iterable, Protocol, Sequence
 
 from banbot import brand
 
@@ -39,7 +39,38 @@ RAYWARD_SOURCES: dict[str, Source] = {
     "okappiki": Source("Okappiki", "Okappiki", "https://okappiki.com/appeal"),
     "serversweep": Source("ServerSweep", "ServerSweep", "https://discord.gg/KdVhtSE4Jp"),
 }
-CHECKED_SOURCES = "Rayward's sources (" + ", ".join(s.label for s in RAYWARD_SOURCES.values()) + ")"
+# Sources the developer has switched off with /sources, bot-wide. The state lives in the source_state table and
+# is loaded at startup. A disabled source stays in RAYWARD_SOURCES: old cases and ban DMs still need its name
+# and appeal link; it just isn't looked up.
+_disabled: set[str] = set()
+
+
+def set_disabled_sources(keys: Iterable[str]) -> None:
+    _disabled.clear()
+    _disabled.update(k for k in keys if k in RAYWARD_SOURCES)
+
+
+def is_enabled(source: str) -> bool:
+    return source not in _disabled
+
+
+def active_sources() -> dict[str, Source]:
+    return {k: s for k, s in RAYWARD_SOURCES.items() if k not in _disabled}
+
+
+def _listed(labels: list[str]) -> str:
+    if not labels:
+        return "no sources"
+    return labels[0] if len(labels) == 1 else ", ".join(labels[:-1]) + " and " + labels[-1]
+
+
+def active_sources_text() -> str:
+    """"Rotector, RCR, ... and ServerSweep" for whatever is switched on right now."""
+    return _listed([s.label for s in active_sources().values()])
+
+
+def checked_sources() -> str:
+    return "Rayward's sources (" + ", ".join(s.label for s in active_sources().values()) + ")"
 
 
 def source_label(provider: str) -> str:
@@ -111,9 +142,12 @@ class CombinedProvider:
         self.sources = list(sources)
 
     async def lookup(self, roblox_ids: Sequence[int]) -> dict[int, FlagResult]:
-        answers = await asyncio.gather(*(s.lookup(roblox_ids) for s in self.sources), return_exceptions=True)
+        sources = [s for s in self.sources if is_enabled(s.name)]  # re-read every call: /sources applies at once
+        if not sources:  # never "clean" just because nothing was asked
+            return {rid: FlagResult.inconclusive(self.name, "every flag source is switched off") for rid in roblox_ids}
+        answers = await asyncio.gather(*(s.lookup(roblox_ids) for s in sources), return_exceptions=True)
         per_source: list[dict[int, FlagResult]] = []
-        for source, found in zip(self.sources, answers):
+        for source, found in zip(sources, answers):
             if isinstance(found, BaseException):
                 log.error("flag source %s raised: %r", source.name, found)
                 found = {}
@@ -122,7 +156,7 @@ class CombinedProvider:
         for rid in roblox_ids:
             results = [
                 found.get(rid) or FlagResult.inconclusive(source.name, "source returned no entry for this id")
-                for source, found in zip(self.sources, per_source)
+                for source, found in zip(sources, per_source)
             ]
             out[rid] = combine(results)
         return out

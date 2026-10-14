@@ -170,6 +170,16 @@ CREATE TABLE IF NOT EXISTS api_usage (
     count    INTEGER NOT NULL,
     PRIMARY KEY (guild_id, api, day)
 );
+
+-- Bot-wide on/off switch per Rayward source, set by the developer with /sources. No row = enabled.
+CREATE TABLE IF NOT EXISTS source_state (
+    source      TEXT    PRIMARY KEY,
+    enabled     INTEGER NOT NULL,
+    updated_by  INTEGER,
+    updated_at  TEXT
+);
+-- TASE starts off. OR IGNORE: once someone switches it back on, that row wins.
+INSERT OR IGNORE INTO source_state(source, enabled) VALUES ('tase', 0);
 """
 
 
@@ -816,6 +826,17 @@ class Store:
                 (guild_id, api, day, n),
             )
             return self.usage_count(guild_id, api, day)
+
+    # ------------------------------------------------------------------ flag sources on/off (/sources)
+    def disabled_sources(self) -> set[str]:
+        return {r["source"] for r in self._all("SELECT source FROM source_state WHERE enabled = 0")}
+
+    def set_source_enabled(self, source: str, enabled: bool, *, by: int, at: datetime) -> None:
+        self._exec(
+            """INSERT INTO source_state(source, enabled, updated_by, updated_at) VALUES (?, ?, ?, ?)
+               ON CONFLICT(source) DO UPDATE SET enabled = excluded.enabled, updated_by = excluded.updated_by,
+               updated_at = excluded.updated_at""",
+            (source, int(enabled), by, _ts(at)))
 
     # ------------------------------------------------------------------ deletion (see the privacy policy)
     def mark_guild_removed(self, guild_id: int, at: datetime) -> None:

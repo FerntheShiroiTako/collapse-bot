@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from typing import Iterable, Protocol
 
 from banbot.core.enforcement import DECISION_MOD_APPROVED, Banner, BanOutcome, BanRequest
-from banbot.core.flags import CHECKED_SOURCES, FlagOutcome, FlagProvider, FlagResult
+from banbot.core.flags import FlagOutcome, FlagProvider, FlagResult, checked_sources
 from banbot.core.gateway import Gateway, MemberNotFound
 from banbot.settings.config import BOT_OWNER_IDS
 from banbot.storage.store import ReviewRow, Store
@@ -247,8 +247,8 @@ class ReviewQueue:
                 log.warning("review #%s: ban by %s cancelled, no source flags the account now (%s)",
                             review_id, actor_id, fresh.status_name)
                 await self._safe_update(
-                    row, f"Closed · {CHECKED_SOURCES} no longer flag the account ({fresh.status_name}), so nobody was banned")
-                return Decision(True, f"{CHECKED_SOURCES} no longer flag this account ({fresh.status_name}), so nobody "
+                    row, f"Closed · {checked_sources()} no longer flag the account ({fresh.status_name}), so nobody was banned")
+                return Decision(True, f"{checked_sources()} no longer flag this account ({fresh.status_name}), so nobody "
                                       f"was banned. Case #{review_id} is closed.")
             provider, status_name, raw_json = fresh.provider, fresh.status_name, fresh.raw_json()
 

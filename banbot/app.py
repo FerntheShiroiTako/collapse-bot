@@ -100,7 +100,7 @@ def build_guild_http_clients(
     provider = CombinedProvider([
         RaywardSourceProvider(rayward_req, source=source, api_key=cfg.rayward_api_key,
                               base_url=cfg.rayward_base_url, batch_size=cfg.rotector_batch_size)
-        for source in RAYWARD_SOURCES
+        for source in RAYWARD_SOURCES  # all of them; CombinedProvider skips the ones switched off
     ])
 
     bloxlink: BloxlinkClient | None = None

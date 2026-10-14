@@ -86,6 +86,44 @@ def test_every_rayward_source_is_checked():
     assert set(RAYWARD_SOURCES) == {"rotector", "rcr", "tase", "rab", "okappiki", "serversweep"}
 
 
+@pytest.fixture
+def switches():
+    from banbot.core.flags import set_disabled_sources
+    yield set_disabled_sources
+    set_disabled_sources(())  # module-wide state: leave every source on for the other tests
+
+
+def test_a_switched_off_source_is_not_asked_but_keeps_its_label(switches):
+    from banbot.core.flags import active_sources_text, checked_sources, source_label
+    switches({"rcr"})
+    provider = CombinedProvider([FakeSource("rotector", flag(FlagOutcome.CLEAR, "rotector")),
+                                 FakeSource("rcr", RuntimeError("would make it inconclusive"))])
+    assert asyncio.run(provider.lookup([5]))[5].outcome is FlagOutcome.CLEAR
+    assert "RCR" not in active_sources_text() and "RCR" not in checked_sources()
+    assert source_label("rcr") == "RCR"  # existing RCR cases still say where they came from
+
+
+def test_every_source_off_is_inconclusive_never_clean(switches):
+    from banbot.core.flags import RAYWARD_SOURCES
+    switches(RAYWARD_SOURCES)
+    provider = CombinedProvider([FakeSource("rotector", flag(FlagOutcome.CLEAR, "rotector"))])
+    assert asyncio.run(provider.lookup([5]))[5].outcome is FlagOutcome.INCONCLUSIVE
+
+
+def test_source_switches_persist_and_tase_starts_off(tmp_path):
+    from datetime import datetime, timezone
+    from banbot.storage.store import Store
+    path = tmp_path / "s.sqlite3"
+    s = Store(path)
+    assert s.disabled_sources() == {"tase"}
+    s.set_source_enabled("tase", True, by=1, at=datetime.now(timezone.utc))
+    s.set_source_enabled("rab", False, by=1, at=datetime.now(timezone.utc))
+    s.close()
+    s = Store(path)  # the startup seed must not switch TASE back off
+    assert s.disabled_sources() == {"rab"}
+    s.close()
+
+
 def test_awaiting_human_review_goes_to_the_mods():
     from banbot.integrations.rayward import map_flag_type
     assert map_flag_type(10)[2] is FlagOutcome.REVIEW
